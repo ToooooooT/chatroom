@@ -9,10 +9,17 @@
 #include <pthread.h>
 #include <sys/types.h>
 #include <string.h>
+#include <stdbool.h>
+#include <semaphore.h>
+#include <time.h>
+
+#define CHATSIZE 8192
 
 typedef struct message {
     char name[1024];
     char message[1024];
+    bool isLeaveMessage;
+    char time[20];
 } message_t;
 
 typedef struct person {
@@ -20,10 +27,13 @@ typedef struct person {
     int chatCnt;
 } person_t;
 
-int TotalPeople = 0;
-person_t people[1024];
-message_t chatHistory[1025];
-int chatCnt_global = 0;
+volatile int TotalPeople = 0; // present total people in chatroom
+person_t people[1024]; // person in chatroom
+message_t chatHistory[CHATSIZE]; // chat message history
+volatile int chatCnt_global = 0; // total message count
+
+sem_t mutex_chatCnt_global;
+sem_t mutex_TotalPeople;
 
 int listenfd = 0;
 
@@ -34,7 +44,9 @@ int main(int argc, char *argv[])
     struct sockaddr_in serv_addr; 
     struct sockaddr *clientaddr = NULL;
     pthread_t tid;
-    
+
+    sem_init(&mutex_chatCnt_global, 0, 1); // mutex_chatCnt_global = 1
+    sem_init(&mutex_TotalPeople, 0, 1); // mutex_TotalPeople = 1
 
     listenfd = socket(AF_INET, SOCK_STREAM, 0);
     memset(&serv_addr, '0', sizeof(serv_addr));
@@ -62,57 +74,97 @@ int main(int argc, char *argv[])
 
 void *thread(void *vargp) {
     char sendBuff[102400], recvBuff[1025], Name[1024];
+    time_t rawtime;
+    struct tm *info;
+    char present_time[20];
 
     int connfd = *(int *)vargp;
     pthread_detach(pthread_self());
     free(vargp);
+    
+    while (1) {
+        memset(recvBuff, 0, sizeof(recvBuff));
+        read(connfd, recvBuff, sizeof(recvBuff) - 1);
+        
+        // leave the chatroom
+        if (!strlen(recvBuff))
+            break;
 
-    memset(recvBuff, 0, sizeof(recvBuff));
-    read(connfd, recvBuff, sizeof(recvBuff) - 1);
-    strcpy(Name, strtok(recvBuff, ":"));
-    int idx = -1;
-    for (int i = 0; i < TotalPeople; ++i) {
-        if (!strcmp(people[i].name, Name))
-            idx = i;
-    }
-    if (idx == -1) {
-        idx = TotalPeople;
-        TotalPeople++;
-        strcpy(people[idx].name, Name);
-        people[idx].chatCnt = chatCnt_global;
+        strcpy(Name, strtok(recvBuff, ":"));
+        int idx = -1;
+        for (int i = 0; i < TotalPeople; ++i) {
+            if (!strcmp(people[i].name, Name))
+                idx = i;
+        }
+        if (idx == -1) {
+            sem_wait(&mutex_TotalPeople);
+            idx = TotalPeople;
+            TotalPeople++;
+            sem_post(&mutex_TotalPeople);
+            strcpy(people[idx].name, Name);
+            people[idx].chatCnt = chatCnt_global;
+        }
+    
+        if (strlen(recvBuff + strlen(Name) + 1) > 0) {
+            time(&rawtime);
+            info = localtime(&rawtime);
+            strftime(present_time, 20, "%H:%M:%S", info);
+            sem_wait(&mutex_chatCnt_global);
+            strcpy(chatHistory[chatCnt_global].message, recvBuff + strlen(Name) + 1);
+            strcpy(chatHistory[chatCnt_global].name, Name);
+            chatHistory[chatCnt_global].isLeaveMessage = false;
+            strcpy(chatHistory[chatCnt_global].time, present_time);
+            chatCnt_global = (chatCnt_global + 1) & (CHATSIZE - 1);
+            sem_post(&mutex_chatCnt_global);
+        }
+        
+
+        if (chatCnt_global != people[idx].chatCnt) {
+            memset(sendBuff, 0, sizeof(sendBuff)); 
+            for (; people[idx].chatCnt != chatCnt_global; people[idx].chatCnt = (people[idx].chatCnt + 1) & (CHATSIZE - 1)) {
+                if (!strcmp(Name,chatHistory[people[idx].chatCnt].name)) {
+                    strcat(sendBuff, "                                                               ");
+                    strcat(sendBuff, chatHistory[people[idx].chatCnt].name);
+                    strcat(sendBuff, "\n");
+                    strcat(sendBuff, "                                                     ");
+                    strcat(sendBuff, chatHistory[people[idx].chatCnt].message);
+                    strcat(sendBuff, "(");
+                    strcat(sendBuff, chatHistory[people[idx].chatCnt].time);
+                    strcat(sendBuff, ")\n");
+                } else {
+                    strcat(sendBuff, chatHistory[people[idx].chatCnt].name);
+                    strcat(sendBuff, "\n");
+                    for (int i = 0; i < strlen(chatHistory[people[idx].chatCnt].name); ++i)
+                        strcat(sendBuff, " ");
+                    strcat(sendBuff, chatHistory[people[idx].chatCnt].message);
+                    if (!chatHistory[people[idx].chatCnt].isLeaveMessage) {
+                        strcat(sendBuff, "(");
+                        strcat(sendBuff, chatHistory[people[idx].chatCnt].time);
+                        strcat(sendBuff, ")\n");
+                    } else
+                        strcat(sendBuff, "\n");
+                }
+            }
+            write(connfd, sendBuff, strlen(sendBuff) + 1);
+        } 
+        else {
+            write(connfd, "\0", 1);
+        }
+
+        //printf("%s: %d(chatCnt) %d(global chatCnt)\n", Name, people[idx].chatCnt, chatCnt_global);
     }
     
-    if (strlen(recvBuff + strlen(Name) + 1) > 0) {
-        strcpy(chatHistory[chatCnt_global].message, recvBuff + strlen(Name) + 1);
-        strcpy(chatHistory[chatCnt_global].name, Name);
-        chatCnt_global++;
-    }
-
-    if (chatCnt_global > people[idx].chatCnt) {
-        memset(sendBuff, 0, sizeof(sendBuff)); 
-        for (; people[idx].chatCnt < chatCnt_global; people[idx].chatCnt++) {
-            if (!strcmp(Name,chatHistory[people[idx].chatCnt].name)) {
-                strcat(sendBuff, "                                                               ");
-                strcat(sendBuff, ": "); 
-                strcat(sendBuff, chatHistory[people[idx].chatCnt].name);
-                strcat(sendBuff, "\n");
-                strcat(sendBuff, "                                                     ");
-                strcat(sendBuff, chatHistory[people[idx].chatCnt].message);
-                strcat(sendBuff, "\n");
-            } else {
-                strcat(sendBuff, chatHistory[people[idx].chatCnt].name);
-                strcat(sendBuff, ":\n");
-                for (int i = 0; i < strlen(chatHistory[people[idx].chatCnt].name); ++i)
-                    strcat(sendBuff, " ");
-                strcat(sendBuff, chatHistory[people[idx].chatCnt].message);
-                strcat(sendBuff, "\n");
-            }
-        }
-        write(connfd, sendBuff, strlen(sendBuff));
-    } 
-    else {
-        write(connfd, "\0", 1);
-    }
+    time(&rawtime);
+    info = localtime(&rawtime);
+    strftime(present_time, 20, "%H:%M:%S", info);
+    memset(sendBuff, 0, sizeof(sendBuff)); 
+    sprintf(sendBuff, "                    %s leave the chatroom(%s)                    ", Name, present_time);
+    sem_wait(&mutex_chatCnt_global);
+    strcpy(chatHistory[chatCnt_global].message, sendBuff);
+    chatHistory[chatCnt_global].isLeaveMessage = true;
+    strcpy(chatHistory[chatCnt_global].time, present_time);
+    chatCnt_global = (chatCnt_global + 1) & (CHATSIZE - 1);
+    sem_post(&mutex_chatCnt_global);
             
     close(connfd);
 
