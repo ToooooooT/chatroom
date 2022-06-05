@@ -10,15 +10,27 @@
 #include <sys/types.h>
 #include <string.h>
 
+typedef struct message {
+    char name[1024];
+    char message[1024];
+} message_t;
+
+typedef struct person {
+    char name[1024];
+    int chatCnt;
+} person_t;
+
 int TotalPeople = 0;
-char chatHistory[1025][1024];
-int chatCnt = 0;
+person_t people[1024];
+message_t chatHistory[1025];
+int chatCnt_global = 0;
+
+int listenfd = 0;
 
 void *thread(void *vargp);
 
 int main(int argc, char *argv[])
 {
-    int listenfd = 0;
     struct sockaddr_in serv_addr; 
     struct sockaddr *clientaddr = NULL;
     pthread_t tid;
@@ -35,6 +47,9 @@ int main(int argc, char *argv[])
 
     listen(listenfd, 10); 
 
+    memset(people, 0, sizeof(person_t) * 1024);
+    memset(chatHistory, 0, sizeof(message_t) * 1024);
+
     while(1)
     {
         int *connfd = malloc(sizeof(int));
@@ -46,22 +61,57 @@ int main(int argc, char *argv[])
 }
 
 void *thread(void *vargp) {
-    char sendBuff[1025], recvBuff[1025];
+    char sendBuff[102400], recvBuff[1025], Name[1024];
 
     int connfd = *(int *)vargp;
     pthread_detach(pthread_self());
     free(vargp);
 
-    memset(sendBuff, 0, sizeof(sendBuff)); 
-    strncpy(sendBuff, "Hello World!", 12);
-    write(connfd, sendBuff, strlen(sendBuff));
-    printf("wwww chatCnt = %d\n", chatCnt);
-
-    memset(recvBuff, 0, sizeof(recvBuff)); 
+    memset(recvBuff, 0, sizeof(recvBuff));
     read(connfd, recvBuff, sizeof(recvBuff) - 1);
-    if (strlen(recvBuff) > 0) {
-        strcpy(chatHistory[chatCnt], recvBuff);
-        chatCnt++;
+    strcpy(Name, strtok(recvBuff, ":"));
+    int idx = -1;
+    for (int i = 0; i < TotalPeople; ++i) {
+        if (!strcmp(people[i].name, Name))
+            idx = i;
+    }
+    if (idx == -1) {
+        idx = TotalPeople;
+        TotalPeople++;
+        strcpy(people[idx].name, Name);
+        people[idx].chatCnt = chatCnt_global;
+    }
+    
+    if (strlen(recvBuff + strlen(Name) + 1) > 0) {
+        strcpy(chatHistory[chatCnt_global].message, recvBuff + strlen(Name) + 1);
+        strcpy(chatHistory[chatCnt_global].name, Name);
+        chatCnt_global++;
+    }
+
+    if (chatCnt_global > people[idx].chatCnt) {
+        memset(sendBuff, 0, sizeof(sendBuff)); 
+        for (; people[idx].chatCnt < chatCnt_global; people[idx].chatCnt++) {
+            if (!strcmp(Name,chatHistory[people[idx].chatCnt].name)) {
+                strcat(sendBuff, "                                                               ");
+                strcat(sendBuff, ": "); 
+                strcat(sendBuff, chatHistory[people[idx].chatCnt].name);
+                strcat(sendBuff, "\n");
+                strcat(sendBuff, "                                                     ");
+                strcat(sendBuff, chatHistory[people[idx].chatCnt].message);
+                strcat(sendBuff, "\n");
+            } else {
+                strcat(sendBuff, chatHistory[people[idx].chatCnt].name);
+                strcat(sendBuff, ":\n");
+                for (int i = 0; i < strlen(chatHistory[people[idx].chatCnt].name); ++i)
+                    strcat(sendBuff, " ");
+                strcat(sendBuff, chatHistory[people[idx].chatCnt].message);
+                strcat(sendBuff, "\n");
+            }
+        }
+        write(connfd, sendBuff, strlen(sendBuff));
+    } 
+    else {
+        write(connfd, "\0", 1);
     }
             
     close(connfd);
