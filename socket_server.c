@@ -65,14 +65,13 @@ int main(int argc, char *argv[])
 
     long cnt = 0;
 
-    while(1)
-    {
+    while(1) {
         int *connfd = malloc(sizeof(int));
         *connfd = accept(listenfd, (struct sockaddr*)NULL, NULL);
         pthread_create(&tid, NULL, thread_create_user, connfd);
-       
         sleep(1);
-     }
+    }
+    printf("imposible\n");
 }
 
 void *thread_create_user(void *vargp) {
@@ -107,7 +106,7 @@ void *thread_create_user(void *vargp) {
         info = localtime(&rawtime);
         strftime(present_time, 20, "%H:%M:%S", info);
         memset(message, 0, sizeof(message)); 
-        sprintf(message, "%s enter the chatroom(%s)", Name, present_time);
+        sprintf(message, "%s enter the chatroom", Name);
 
         sem_wait(&mutex_chatCnt_global);
         strcpy(chatHistory[chatCnt_global].name, "server");
@@ -120,14 +119,16 @@ void *thread_create_user(void *vargp) {
     pair_t *pair = malloc (sizeof(pair_t));
     pair->connfd = connfd;
     strcpy(pair->name, Name);
-    if (strcmp(recvBuff + strlen(Name) + 1, "read")) {
+    if (!strcmp(recvBuff + strlen(Name) + 1, "read")) {
         // create read thread
+        printf("read\n");
         pthread_create(&tid, NULL, thread_read, pair);
     } else {
         // write read thread
-        pthread_create(&tid, NULL, thread_read, pair);
+        printf("write\n");
+        pthread_create(&tid, NULL, thread_write, pair);
     }
-    
+
     return NULL;
 }
 
@@ -138,10 +139,10 @@ void *thread_read(void *vargp) {
     
     strcpy(Name, ((pair_t *)vargp)->name);
     int connfd = ((pair_t *)vargp)->connfd;
-
     pthread_detach(pthread_self());
 
     while (1) {
+        printf("reading\n");
         memset(recvBuff, 0, sizeof(recvBuff));
         read(connfd, recvBuff, sizeof(recvBuff) - 1);
         
@@ -166,7 +167,7 @@ void *thread_read(void *vargp) {
     strftime(present_time, 20, "%H:%M:%S", info);
 
     memset(recvBuff, 0, sizeof(recvBuff)); 
-    sprintf(recvBuff, "%s leave the chatroom(%s)", Name, present_time);
+    sprintf(recvBuff, "%s leave the chatroom", Name);
 
     sem_wait(&mutex_chatCnt_global);
     strcpy(chatHistory[chatCnt_global].name, "server");
@@ -182,7 +183,7 @@ void *thread_read(void *vargp) {
 }
 
 void *thread_write(void *vargp) {
-    char sendBuff[10240];
+    char sendBuff[10240], checkOnlineBuff[2];
 
     char Name[12];
     strcpy(Name, ((pair_t *)vargp)->name);
@@ -193,16 +194,21 @@ void *thread_write(void *vargp) {
     
     while (1) {
         if (chatCnt_global != chatCnt) {
+            printf("writing\n");
             memset(sendBuff, 0, sizeof(sendBuff)); 
             sprintf(sendBuff, "%s:%s(%s)", chatHistory[chatCnt].name, chatHistory[chatCnt].message, chatHistory[chatCnt].time);
+            printf("%s\n", sendBuff);
             write(connfd, sendBuff, strlen(sendBuff) + 1);
+            read(connfd, checkOnlineBuff, 2);
+            if (strlen(checkOnlineBuff) == 0) {
+                break;
+            }
             chatCnt = (chatCnt + 1) & (CHATSIZE - 1);
-        } 
+        }
 
         sleep(1);
     }
-    
-           
+
     free(vargp);
     close(connfd);
 

@@ -9,23 +9,27 @@
 #include <unistd.h>
 #include <errno.h>
 #include <arpa/inet.h> 
+#include <pthread.h>
+#include <semaphore.h>
+
+void *thread_read_chat();
+void *thread_send_text();
+
+bool toQuit = false;
 
 int main(int argc, char *argv[])
 {
-    int sockfd = 0, n = 0;
-    char recvBuff[1024], op[10], message[1024], sendBuff[2050];
-    struct sockaddr_in serv_addr; 
-    bool haveEnteredName = false;
+    int sockfd = 0;
+    char recvBuff[1024], message[1024];
+    struct sockaddr_in serv_addr;
 
-    if(argc != 3)
-    {
+    if(argc != 3) {
         printf("\n Usage: %s <ip of server> \n",argv[0]);
         return 1;
     }
     
     memset(recvBuff, 0 ,sizeof(recvBuff));
-    if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-    {
+    if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         printf("\n Error : Could not create socket \n");
         return 1;
     } 
@@ -34,65 +38,98 @@ int main(int argc, char *argv[])
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(5000); 
 
-    if(inet_pton(AF_INET, argv[1], &serv_addr.sin_addr)<=0)
-    {   
+    if(inet_pton(AF_INET, argv[1], &serv_addr.sin_addr)<=0) {   
         printf("\n inet_pton error occured\n");
         return 1;
     }
 
-    if(connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-    {
+    if(connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
         printf("\n Error : Connect Failed \n");
         return 1;
     }
 
-    while (1) {
-        if (!haveEnteredName) {             
-            memset(message, 0, 1024);
-            sprintf(message, "%s:", argv[2]);
-            write(sockfd, message, strlen(argv[2]));
-            haveEnteredName = true;
-        } else {
-        
-            printf(">>> (op) ");
-            scanf("%s", op);
+    memset(message, 0, 1024);
+    sprintf(message, "%s:read", argv[2]);
+    write(sockfd, message, strlen(message));
 
-            if (op[0] == 'q') {
-                printf("%s leave the chatroom\n", argv[2]);
-                break;
-            }
-            else if (op[0] == 'w') {
-                // write
-                memset(message, 0, 1024);
-                printf(">>> (send message) ");
-                scanf("%s", message);            
-                sprintf(sendBuff, "%s:%s", argv[2], message);
-                write(sockfd, sendBuff, strlen(sendBuff) + 1);
-            }
-            else {
-                memset(message, 0, 1024);
-                sprintf(message, "%s:", argv[2]);
-                write(sockfd, message, strlen(message) + 1);
-            }
-        }
-
-        // read history
-        sleep(1);
-        n = read(sockfd, recvBuff, sizeof(recvBuff) - 1);
-        if (strlen(recvBuff))
-            printf("%s", recvBuff);
-            /*
-            if(fputs(recvBuff, stdout) == EOF)
-            {
-                printf("\n Error : Fputs error\n");
-            }
-            */
+    pthread_t tid_send_text;
+    if (pthread_create(&tid_send_text, NULL, thread_send_text, &sockfd) != 0) {
+        printf("Error : pthread_create\n");
     }
 
-    if(n < 0)
-    {
-        printf("\n Read error \n");
-    } 
+    sleep(1);
 
+    pthread_t tid_read_chat;
+    if (pthread_create(&tid_read_chat, NULL, thread_read_chat, argv) != 0) {
+        printf("Error : pthread_create\n");
+    }
+
+    pthread_exit(NULL);
     return 0;
+}
+
+void *thread_read_chat(void *vargp)
+{
+    int sockfd = 0;
+    char recvBuff[1024], message[1024];
+    char **argv = vargp;
+    struct sockaddr_in serv_addr;
+
+    pthread_detach(pthread_self());
+    memset(recvBuff, 0 ,sizeof(recvBuff));
+
+    if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        printf("\n Error : Could not create socket \n");
+        return NULL;
+    }
+    memset(&serv_addr, '0', sizeof(serv_addr));
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(5000);
+
+    if(inet_pton(AF_INET, argv[1], &serv_addr.sin_addr)<=0) {   
+        printf("\n inet_pton error occured\n");
+        return NULL;
+    }
+
+    if(connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+        printf("\n Error : Connect Failed \n");
+        return NULL;
+    }
+
+    memset(message, 0, 1024);
+    sprintf(message, "%s:write", argv[2]);
+    write(sockfd, message, strlen(argv[2]));
+
+    while (!toQuit) {
+        memset(recvBuff, 0, sizeof(recvBuff));
+        read(sockfd, recvBuff, sizeof(recvBuff));
+        write(sockfd, "1", 2);
+        printf("%s\n", recvBuff);
+        sleep(1);
+    }
+    write(sockfd, "", 2);
+    close(sockfd);
+    return NULL;
+}
+
+void *thread_send_text(void *vargp)
+{
+    int sockfd = *(int *)vargp;
+    char message[1024];
+    pthread_detach(pthread_self());
+    while (!toQuit) {
+        memset(message, 0, sizeof(message)); 
+        fgets(message, 1024, stdin);
+        message[strlen(message) - 1] = 0;
+        if (message[0] == '/') {
+            if (!strcmp(message, "/quit")) {
+                toQuit = true;
+                message[0] = 0;
+            }
+        }
+        write(sockfd, message, strlen(message) + 1);
+    }
+    close(sockfd);
+    return NULL;
 }
