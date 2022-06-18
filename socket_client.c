@@ -15,6 +15,8 @@
 void *thread_read_chat();
 void *thread_send_text();
 
+enum {SECS_TO_SLEEP = 0, NSEC_TO_SLEEP = 125};
+
 bool toQuit = false;
 
 int main(int argc, char *argv[])
@@ -106,7 +108,6 @@ void *thread_read_chat(void *vargp)
         read(sockfd, recvBuff, sizeof(recvBuff));
         write(sockfd, "1", 2);
         printf("%s\n", recvBuff);
-        sleep(1);
     }
     write(sockfd, "", 2);
     close(sockfd);
@@ -117,6 +118,9 @@ void *thread_send_text(void *vargp)
 {
     int sockfd = *(int *)vargp;
     char message[1024];
+
+    struct timespec remaining, request = {SECS_TO_SLEEP, NSEC_TO_SLEEP};
+
     pthread_detach(pthread_self());
     while (!toQuit) {
         memset(message, 0, sizeof(message)); 
@@ -129,6 +133,8 @@ void *thread_send_text(void *vargp)
             }
         }
         write(sockfd, message, strlen(message) + 1);
+        
+        nanosleep(&request, &remaining);
     }
     close(sockfd);
     return NULL;
