@@ -9,10 +9,10 @@
 #include <unistd.h>
 #include <errno.h>
 #include <arpa/inet.h> 
-#include <semaphore.h>
 #include <time.h>
 
 enum {SECS_TO_SLEEP = 0, NSEC_TO_SLEEP = 125};
+enum {quit = 1, chat = 2, sticker = 3};
 
 bool toQuit = false;
 
@@ -55,13 +55,21 @@ int main(int argc, char *argv[])
 
     while (!toQuit) {
         memset(message, 0, sizeof(message)); 
-        fgets(message, 1024, stdin);
+        fgets(message + 1, 1024, stdin);
         popen("reset", "w");
-        message[strlen(message) - 1] = 0;
-        if (message[0] == '/') {
-            if (!strcmp(message, "/quit")) {
+        message[strlen(message + 1)] = 0;
+        message[0] = chat;
+        if (message[1] == '/') {
+            if (!strcmp(message + 1, "/quit")) {
                 toQuit = true;
-                message[0] = 0;
+                message[0] = quit;
+            } else if (!strncmp(message + 1, "/sticker ", 9)) {
+                message[0] = sticker;
+                message[1] = atoi(message + 10);
+                message[2] = 0;
+            } else {
+                nanosleep(&request, &remaining);
+                continue;
             }
         }
         write(sockfd, message, strlen(message) + 1);

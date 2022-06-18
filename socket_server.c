@@ -20,7 +20,7 @@ enum {SECS_TO_SLEEP = 0, NSEC_TO_SLEEP = 125};
 
 typedef struct message {
     char name[12];
-    enum {quit, chat, sticker}command;
+    enum {quit = 1, chat = 2, sticker = 3}command;
     char stickerID;
     char message[1024];
     char time[20];

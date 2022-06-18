@@ -55,7 +55,7 @@ int apple(char *buff)
     return 38;
 }
 
-int tea(char* buff)
+int tea(char *buff)
 {
     buff[0] = 0;
     CAT("    (  )   (   )  )      ")
@@ -70,4 +70,87 @@ int tea(char* buff)
     CAT("/    \\___________/    \\  ")
     CAT("\\_____________________/  ")
     return 25;
+}
+
+int ant(char *buff)
+{
+    buff[0] = 0;
+    CAT("    ,")
+    CAT("ooo< ")
+    CAT("|||  ")
+    return 5;
+}
+
+int dancing(char *buff)
+{
+    buff[0] = 0;
+    CAT("   _O/                   ,             ")
+    CAT("     \\                  /           \\O_")
+    CAT("     /\\_             `\\_\\        ,/\\/  ")
+    CAT("     \\  `       ,        \\         /   ")
+    CAT("     `       O/ /       /O\\        \\   ")
+    CAT("             /\\|/\\.                `   ")
+    return 39;
+}
+
+int phone(char *buff)
+{
+    buff[0] = 0;
+    CAT("           ,-. ")
+    CAT("           | | ")
+    CAT("           | | ")
+    CAT("  ,-\"\"\"\"\"\"\"-.| ")
+    CAT(" /  __:::__()\\ ")
+    CAT("J .\"_______\". L")
+    CAT("JJ,\"       \".LL")
+    CAT("|J|Never    |L|")
+    CAT("|||Gonna    |||")
+    CAT("L||Give You ||J")
+    CAT("LJ|Up       |LJ")
+    CAT("LJ._________,LJ")
+    CAT("L ___     ___ J")
+    CAT("| \\__)---(__/ |")
+    CAT("J----(===)----L")
+    CAT(" L\\ \"-___-\" /J ")
+    CAT(" | \"-------\" | ")
+    CAT(" |           | ")
+    CAT(" |           | ")
+    CAT(" |           | ")
+    CAT(" |           | ")
+    CAT(" |           | ")
+    CAT(" |           | ")
+    CAT(" |           | ")
+    CAT(" |    ...    | ")
+    CAT(" \"-----------\" ")
+    return 15;
+}
+
+int winnie(char *buff)
+{
+    buff[0] = 0;
+    CAT("                   __       ")
+    CAT("              ,_  :  \\      ")
+    CAT("              ; L_;   ;.    ")
+    CAT("              `.' `   ` \\   ")
+    CAT("             ,'          ;  ")
+    CAT("             ; \",        |  ")
+    CAT("           .-' *         |  ")
+    CAT("          $    _         ;_ ")
+    CAT("           \\   ;      _.-' )")
+    CAT("            `+*     .'   -')")
+    CAT("             .`._.-'      / ")
+    CAT("            ,(      .-   :  ")
+    CAT("         _.: ; -'.'     `,  ")
+    CAT("   /\\--*\"   \\/  .'     ;  ; ")
+    CAT("  /  \\      /-.-'\"*.  /    \\")
+    CAT(" ;__.-*\"\\.--*\"      ;:_..-+'")
+    CAT(" \\\\     :       _.-'       ;")
+    CAT("  \\\\    *.___.-'           :")
+    CAT(" .-\\\\      \\               |")
+    CAT(": ;.-.      \\-*\"\"*.        ;")
+    CAT(": : ; ; _.-*\"      ;      / ")
+    CAT(" Y: : '\"           ,___.-'  ")
+    CAT("   Y'  __...___.-*\"         ")
+    CAT("    `\"'                     ")
+    return 28;
 }
