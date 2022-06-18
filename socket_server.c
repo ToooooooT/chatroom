@@ -166,7 +166,6 @@ void *thread_read(void *vargp) {
 
     memset(recvBuff, 0, sizeof(recvBuff)); 
     sprintf(recvBuff, "%s leave the chatroom", Name);
-    printf("%s\n", recvBuff); 
 
     sem_wait(&mutex_chatCnt_global);
     strcpy(chatHistory[chatCnt_global].name, "server");
@@ -209,7 +208,6 @@ void *thread_write(void *vargp) {
         nanosleep(&request, &remaining);
     }
 
-    printf("write break\n");
 
     free(vargp);
     close(connfd);
