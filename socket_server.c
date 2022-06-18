@@ -17,8 +17,11 @@
 
 enum {SECS_TO_SLEEP = 0, NSEC_TO_SLEEP = 125};
 
+
 typedef struct message {
     char name[12];
+    enum {quit, chat, sticker}command;
+    char stickerID;
     char message[1024];
     char time[20];
 } message_t;
@@ -110,6 +113,8 @@ void *thread_create_user(void *vargp) {
         sprintf(message, "%s enter the chatroom", Name);
 
         sem_wait(&mutex_chatCnt_global);
+        chatHistory[chatCnt_global].command = chat;
+        chatHistory[chatCnt_global].stickerID = -1;
         strcpy(chatHistory[chatCnt_global].name, "server");
         strcpy(chatHistory[chatCnt_global].message, message);
         strcpy(chatHistory[chatCnt_global].time, present_time);
@@ -153,10 +158,21 @@ void *thread_read(void *vargp) {
         strftime(present_time, 20, "%H:%M:%S", info);
 
         sem_wait(&mutex_chatCnt_global);
-        strcpy(chatHistory[chatCnt_global].message, recvBuff);
-        strcpy(chatHistory[chatCnt_global].name, Name);
-        strcpy(chatHistory[chatCnt_global].time, present_time);
-        chatCnt_global = (chatCnt_global + 1) & (CHATSIZE - 1);
+        if (recvBuff[0] == sticker) {
+            chatHistory[chatCnt_global].command = sticker;
+            chatHistory[chatCnt_global].stickerID = recvBuff[1];
+            strcpy(chatHistory[chatCnt_global].message, "");
+            strcpy(chatHistory[chatCnt_global].name, Name);
+            strcpy(chatHistory[chatCnt_global].time, present_time);
+            chatCnt_global = (chatCnt_global + 1) & (CHATSIZE - 1);
+        } else {
+            chatHistory[chatCnt_global].command = recvBuff[0];
+            chatHistory[chatCnt_global].stickerID = -1;
+            strcpy(chatHistory[chatCnt_global].message, recvBuff + 1);
+            strcpy(chatHistory[chatCnt_global].name, Name);
+            strcpy(chatHistory[chatCnt_global].time, present_time);
+            chatCnt_global = (chatCnt_global + 1) & (CHATSIZE - 1);
+        }
         sem_post(&mutex_chatCnt_global);
     }
     
@@ -164,10 +180,12 @@ void *thread_read(void *vargp) {
     info = localtime(&rawtime);
     strftime(present_time, 20, "%H:%M:%S", info);
 
-    memset(recvBuff, 0, sizeof(recvBuff)); 
+    memset(recvBuff, 0, sizeof(recvBuff));
     sprintf(recvBuff, "%s leave the chatroom", Name);
 
     sem_wait(&mutex_chatCnt_global);
+    chatHistory[chatCnt_global].command = quit;
+    chatHistory[chatCnt_global].stickerID = -1;
     strcpy(chatHistory[chatCnt_global].name, "server");
     strcpy(chatHistory[chatCnt_global].message, recvBuff);
     strcpy(chatHistory[chatCnt_global].time, present_time);
@@ -196,11 +214,19 @@ void *thread_write(void *vargp) {
         if (chatCnt_global != chatCnt) {
             memset(sendBuff, 0, sizeof(sendBuff)); 
             memset(checkOnlineBuff, 0, 2); 
-            sprintf(sendBuff, "%s:%s(%s)", chatHistory[chatCnt].name, chatHistory[chatCnt].message, chatHistory[chatCnt].time);
-            write(connfd, sendBuff, strlen(sendBuff) + 1);
-            read(connfd, checkOnlineBuff, 2);
-            if (strlen(checkOnlineBuff) == 0) {
-                break;
+            if (chatHistory[chatCnt].command == sticker) {
+                // buff[] = command name:stickerID(time)
+                sprintf(sendBuff, "%c%s:%c(%s)", chatHistory[chatCnt].command, chatHistory[chatCnt].name, chatHistory[chatCnt].stickerID, chatHistory[chatCnt].time);
+                write(connfd, sendBuff, strlen(sendBuff) + 1);
+                read(connfd, checkOnlineBuff, 2);
+            } else {
+                // buff[] = command name:message(time)
+                sprintf(sendBuff, "%c%s:%s(%s)", chatHistory[chatCnt].command, chatHistory[chatCnt].name, chatHistory[chatCnt].message, chatHistory[chatCnt].time);
+                write(connfd, sendBuff, strlen(sendBuff) + 1);
+                read(connfd, checkOnlineBuff, 2);
+                if (strlen(checkOnlineBuff) == 0) {
+                    break;
+                }
             }
             chatCnt = (chatCnt + 1) & (CHATSIZE - 1);
         }
