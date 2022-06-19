@@ -1,6 +1,16 @@
 #include <string.h>
 #define CAT(x) {strcat(buff, x);}
 
+/*----------------------------------
+    1: penguin
+    2: apple
+    3: tea
+    4: ant
+    5: dancing
+    6: phone
+    7: winnie
+    8: skeleton
+----------------------------------*/
 
 int penguin(char *buff)
 {
