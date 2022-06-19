@@ -65,6 +65,8 @@ int main(int argc, char *argv[])
             strcpy(name, strtok(recvBuff + 1, ":"));
             stickerID = recvBuff[strlen(name) + 2];
             int stickerWidth = match_sticker(message, stickerID);
+            if (stickerWidth <= 0)
+                continue;
             char *p = message;
             if (strcmp(argv[2], name)) {
                 printf("%s\n", name);
