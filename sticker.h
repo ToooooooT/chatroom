@@ -154,3 +154,17 @@ int winnie(char *buff)
     CAT("    `\"'                     ")
     return 28;
 }
+
+int match_sticker(char *buff, char stickerID)
+{
+    switch (stickerID) {
+        case 1: return penguin(buff);
+        case 2: return apple(buff);
+        case 3: return tea(buff);
+        case 4: return ant(buff);
+        case 5: return dancing(buff);
+        case 6: return phone(buff);
+        case 7: return winnie(buff);
+        default: return -1;
+    }
+}

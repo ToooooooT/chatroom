@@ -12,11 +12,11 @@
 #include "sticker.h"
 
 #define SCREEN_WIDTH 70
-#define PRINT_CHAR(len, c)                                      \
-    do {                                                        \
-        for (int i = 0; i < (len); ++i)          \
-            putchar(c);                                         \
-    } while(0)                                                  \
+#define PRINT_CHAR(len, c)              \
+    do {                                \
+        for (int i = 0; i < (len); ++i) \
+            putchar(c);                 \
+    } while(0)                          \
 
 enum {SECS_TO_SLEEP = 0, NSEC_TO_SLEEP = 125};
 enum {quit = 1, chat = 2, sticker = 3};
@@ -141,18 +141,4 @@ int main(int argc, char *argv[])
     close(sockfd);
 
     return 0;
-}
-
-int match_sticker(char *buff, char stickerID)
-{
-    switch (stickerID) {
-        case 1: return penguin(buff);
-        case 2: return apple(buff);
-        case 3: return tea(buff);
-        case 4: return ant(buff);
-        case 5: return dancing(buff);
-        case 6: return phone(buff);
-        case 7: return winnie(buff);
-        default: return -1;
-    }
 }
