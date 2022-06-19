@@ -14,7 +14,7 @@
 enum {SECS_TO_SLEEP = 0, NSEC_TO_SLEEP = 125};
 enum {quit = 1, chat = 2, sticker = 3};
 
-bool toQuit = false;
+bool toQuit = false; // global boolean to decide to quit process or not
 
 int main(int argc, char *argv[])
 {
@@ -46,7 +46,8 @@ int main(int argc, char *argv[])
         printf("\n Error : Connect Failed \n");
         return 1;
     }
-
+    
+    // send the first message to server to let server know who is enter in the chatroom and create a new thread for this client
     memset(message, 0, 1024);
     sprintf(message, "%s:read", argv[2]);
     write(sockfd, message, strlen(message));
@@ -54,17 +55,19 @@ int main(int argc, char *argv[])
     struct timespec remaining, request = {SECS_TO_SLEEP, NSEC_TO_SLEEP};
 
     while (!toQuit) {
-        memset(message, 0, sizeof(message)); 
+        memset(message, 0, sizeof(message));
+        // read user message
         fgets(message + 1, 1024, stdin);
+        // reset window when user send message
         popen("reset", "w");
         message[strlen(message + 1)] = 0;
-        message[0] = chat;
+        message[0] = chat; // command chat
         if (message[1] == '/') {
             if (!strcmp(message + 1, "/quit")) {
                 toQuit = true;
-                message[0] = quit;
+                message[0] = quit; // command quit
             } else if (!strncmp(message + 1, "/sticker ", 9)) {
-                message[0] = sticker;
+                message[0] = sticker; // command sticker
                 message[1] = atoi(message + 10);
                 message[2] = 0;
             } else {
