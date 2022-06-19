@@ -52,6 +52,9 @@ int main(int argc, char *argv[])
     memset(message, 0, 1024);
     sprintf(message, "%s:write", argv[2]);
     write(sockfd, message, strlen(argv[2]));
+
+    PRINT_CHAR(((SCREEN_WIDTH - 38) / 2), ' ');
+    printf("contributors: stupidrara and ToooooooT\n");
     
     while (1) {
         memset(recvBuff, 0, sizeof(recvBuff));
